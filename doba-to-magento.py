@@ -65,7 +65,7 @@ def create_inventory_dict(row):
 parser = argparse.ArgumentParser(description='Process a Doba Product Export.')
 parser.add_argument('filename', type=str,
                    help='the name of the file to parse')
-parser.add_argument('-c', '--category', nargs=1, default='')
+parser.add_argument('-c', '--category', nargs=1, default=[''])
 
 args = parser.parse_args()
 export_dir = 'magento-export'
