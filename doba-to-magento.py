@@ -32,6 +32,7 @@ def create_magento_dict(row, args):
     "_attribute_set": 'Default',
     "_type": 'simple',
     "_category": args.category[0],
+    "_product_websites": 'base',
     "url_key": slugify(row.get('item_name')), 
     "cost": row.get('price'),
     "description": row.get('description'),
