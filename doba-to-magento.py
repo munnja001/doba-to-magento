@@ -1,8 +1,5 @@
 #!/usr/bin/env python
-import csv
-import argparse
-import os
-import re
+import csv, argparse, os, re
 
 
 _slugify_strip_re = re.compile(r'[^\w\s-]')
@@ -22,7 +19,7 @@ def slugify(value):
     return _slugify_hyphenate_re.sub('-', value)
 
 
-magento_fieldnames = ["sku","_store","_attribute_set","_type","_category","_product_websites","color","cost","country_of_manufacture","created_at","custom_design","custom_design_from","custom_design_to","custom_layout_update","description","enable_googlecheckout","gallery","gift_message_available","has_options","image","image_label","is_imported","manufacturer","meta_description","meta_keyword","meta_title","minimal_price","msrp","msrp_display_actual_price_type","msrp_enabled","name","news_from_date","news_to_date","options_container","page_layout","price","required_options","short_description","small_image","small_image_label","special_from_date","special_price","special_to_date","status","tax_class_id","thumbnail","thumbnail_label","updated_at","url_key","visibility","weight","qty","min_qty","use_config_min_qty","is_qty_decimal","backorders","use_config_backorders","min_sale_qty","use_config_min_sale_qty","max_sale_qty","use_config_max_sale_qty","is_in_stock","notify_stock_qty","use_config_notify_stock_qty","manage_stock","use_config_manage_stock","stock_status_changed_auto","use_config_qty_increments","qty_increments","use_config_enable_qty_inc","enable_qty_increments","_links_related_sku","_links_related_position","_links_crosssell_sku","_links_crosssell_position","_links_upsell_sku","_links_upsell_position","_associated_sku","_associated_default_qty","_associated_position","_tier_price_website","_tier_price_customer_group","_tier_price_qty","_tier_price_price","_media_attribute_id","_media_image","_media_lable","_media_position","_media_is_disabled"]
+magento_fieldnames = ["sku", "_attribute_set", "_type", "_category", "_product_websites", "url_key", "cost", "description", "image", "name", "price", "_media_image", "_media_attribute_id", "_media_position", "_media_is_disabled", "short_description", "small_image", "status", "tax_class_id", "thumbnail", "visibility", "weight", "qty", "backorders", "is_in_stock", "manage_stock"]
 
 def create_magento_dict(row, args):
   image_url = '/' + row.get('image_file').split('/')[-1]
@@ -73,10 +70,9 @@ export_dir = 'magento-export'
 if not os.path.exists(export_dir):
     os.mkdir(export_dir)
 
-with open(args.filename, 'rbU') as inputfile, open(export_dir + '/magento.csv', 'w+') as magento_file, open(export_dir + '/urls.txt', 'w+') as urls_file:
+with open(args.filename, 'rbU') as inputfile, open(export_dir + '/magento.csv', 'w+') as magento_file:
     product_reader = csv.DictReader(inputfile, delimiter=',', quotechar='"')
-    magento_writer = csv.DictWriter(magento_file, delimiter=',', quotechar='"', fieldnames = magento_fieldnames, quoting=csv.QUOTE_ALL)
+    magento_writer = csv.DictWriter(magento_file, delimiter=',', quotechar='"', fieldnames = magento_fieldnames, quoting=csv.QUOTE_ALL, lineterminator = '\n')
     magento_writer.writeheader()
     for row in product_reader:
-      urls_file.write(row.get('image_file') + '\n')
       magento_writer.writerow(create_magento_dict(row, args))
