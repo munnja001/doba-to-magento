@@ -5,6 +5,7 @@ parser = argparse.ArgumentParser(description='Process a Doba Product Export.')
 parser.add_argument('filename', type=str,
                    help='the name of the file to parse')
 parser.add_argument('-c', '--category', nargs=1, default=[''])
+parser.add_argument('-q', '--qty-only', dest='quantityonly', action='store_true')
 
 args = parser.parse_args()
 
@@ -28,40 +29,65 @@ def slugify(value):
 # gets the filename from a URL
 def get_filename_from_url(url):
     return url.split('/')[-1]
-
-magento_fieldnames = ["sku", "_attribute_set", "_type", "_category", "_product_websites", "url_key", "cost", "description", "image", "name", "price", "_media_image", "_media_attribute_id", "_media_position", "_media_is_disabled", "short_description", "small_image", "status", "tax_class_id", "thumbnail", "visibility", "weight", "qty", "backorders", "is_in_stock", "manage_stock"]
     
 def create_magento_dict(row):
   image_url = '/' + get_filename_from_url(row.get('image_file'))
   weight = '0.00' if not row.get('item_weight') else row.get('item_weight')
-  return {
-    "sku": row.get('product_sku'),
-    "_attribute_set": 'Default',
-    "_type": 'simple',
-    "_category": args.category[0],
-    "_product_websites": 'base',
-    "url_key": slugify(row.get('item_name')), 
-    "cost": row.get('price'),
-    "description": row.get('description'),
-    "image": image_url,
-    "name": row.get('item_name'),
-    "price": row.get('msrp'),
-    "_media_image": image_url,
-    "_media_attribute_id": '88',
-    "_media_position": '1',
-    "_media_is_disabled": '0',
-    "short_description": row.get('title'),
-    "small_image": image_url,
-    "status": '1',
-    "tax_class_id": '2',
-    "thumbnail": image_url,
-    "visibility": '4',
-    "weight": weight,
-    "qty": row.get('qty_avail'),
-    "backorders": 'No Backorders',
-    "is_in_stock": '1',
-    "manage_stock": '1'
+  result = {
+      "sku": row.get('product_sku'),
+      "qty": row.get('qty_avail'),
+
   }
+  if not args.quantityonly:
+    other_attributes = {
+        "_attribute_set": 'Default',
+        "_type": 'simple',
+        "_category": args.category[0],
+        "_product_websites": 'base',
+        "url_key": slugify(row.get('item_name')), 
+        "cost": row.get('price'),
+        "description": row.get('description'),
+        "image": image_url,
+        "name": row.get('item_name'),
+        "price": row.get('msrp'),
+        "_media_image": image_url,
+        "_media_attribute_id": '88',
+        "_media_position": '1',
+        "_media_is_disabled": '0',
+        "short_description": row.get('title'),
+        "small_image": image_url,
+        "status": '1',
+        "tax_class_id": '2',
+        "thumbnail": image_url,
+        "visibility": '4',
+        "weight": weight,
+        "backorders": 'No Backorders',
+        "is_in_stock": '1',
+        "manage_stock": '1'
+    }
+    result = dict(result.items() + other_attributes.items())
+    
+  return result
+
+magento_fieldnames = ["sku", "_attribute_set", "_type", "_category",
+                      "_product_websites", "url_key", "cost", "description",
+                      "image", "name", "price", "_media_image",
+                      "_media_attribute_id", "_media_position",
+                      "_media_is_disabled", "short_description", "small_image",
+                      "status", "tax_class_id", "thumbnail", "visibility",
+                      "weight", "qty", "backorders", "is_in_stock",
+                      "manage_stock"]
+magento_qty_fieldnames = ["sku","qty"]
+
+def create_full_magento_writer():
+    return create_magento_writer(magento_fieldnames)
+
+def create_qty_magento_writer():
+    return create_magento_writer(magento_qty_fieldnames)
+
+def create_magento_writer(fields):
+    return csv.DictWriter(magento_file, delimiter=',', quotechar='"', fieldnames = fields, quoting=csv.QUOTE_ALL, lineterminator = '\n')
+
 
 # Ensure export dir exists
 if not os.path.exists(config.export_dir):
@@ -71,7 +97,10 @@ image_urls = []
 # Create Magento CSV from Doba CSV
 with open(args.filename, 'rbU') as inputfile, open(config.magento_filename, 'w+') as magento_file:
     product_reader = csv.DictReader(inputfile, delimiter=',', quotechar='"')
-    magento_writer = csv.DictWriter(magento_file, delimiter=',', quotechar='"', fieldnames = magento_fieldnames, quoting=csv.QUOTE_ALL, lineterminator = '\n')
+    if args.quantityonly:
+        magento_writer = create_qty_magento_writer()
+    else:
+        magento_writer = create_full_magento_writer()
     magento_writer.writeheader()
     for row in product_reader:
       image_urls.append(row.get('image_file'))
