@@ -9,6 +9,8 @@ parser.add_argument('-q', '--qty-only', dest='quantityonly', action='store_true'
 
 args = parser.parse_args()
 
+quantity_lower_bound = 0
+
 # Method to generate URL Slug (Copied from Internets)
 _slugify_strip_re = re.compile(r'[^\w\s-]')
 _slugify_hyphenate_re = re.compile(r'[-\s]+')
@@ -29,6 +31,12 @@ def slugify(value):
 # gets the filename from a URL
 def get_filename_from_url(url):
     return url.split('/')[-1]
+
+def is_in_stock(row):
+  if int(row.get('qty_avail')) > quantity_lower_bound:
+    return "1"
+  else:
+    return "0"
     
 def create_magento_dict(row):
   image_url = '/' + get_filename_from_url(row.get('image_file'))
@@ -36,8 +44,10 @@ def create_magento_dict(row):
   result = {
       "sku": row.get('product_sku'),
       "qty": row.get('qty_avail'),
-
+      "is_in_stock": is_in_stock(row),
+      "manage_stock": '1'
   }
+
   if not args.quantityonly:
     other_attributes = {
         "_attribute_set": 'Default',
@@ -61,23 +71,22 @@ def create_magento_dict(row):
         "thumbnail": image_url,
         "visibility": '4',
         "weight": weight,
-        "backorders": 'No Backorders',
-        "is_in_stock": '1',
-        "manage_stock": '1'
+        "backorders": 'No Backorders'
     }
+
     result = dict(result.items() + other_attributes.items())
     
   return result
 
-magento_fieldnames = ["sku", "_attribute_set", "_type", "_category",
+magento_qty_fieldnames = ["sku","qty", "is_in_stock", "manage_stock"]
+
+magento_fieldnames = magento_qty_fieldnames + ["_attribute_set", "_type", "_category",
                       "_product_websites", "url_key", "cost", "description",
                       "image", "name", "price", "_media_image",
                       "_media_attribute_id", "_media_position",
                       "_media_is_disabled", "short_description", "small_image",
                       "status", "tax_class_id", "thumbnail", "visibility",
-                      "weight", "qty", "backorders", "is_in_stock",
-                      "manage_stock"]
-magento_qty_fieldnames = ["sku","qty"]
+                      "weight", "backorders"]
 
 def create_full_magento_writer():
     return create_magento_writer(magento_fieldnames)
