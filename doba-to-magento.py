@@ -42,7 +42,7 @@ def create_magento_dict(row):
   image_url = '/' + get_filename_from_url(row.get('image_file'))
   weight = '0.00' if not row.get('item_weight') else row.get('item_weight')
   result = {
-      "sku": row.get('product_sku'),
+      "sku": row.get('item_sku'),
       "qty": row.get('qty_avail'),
       "is_in_stock": is_in_stock(row),
       "manage_stock": '1'
