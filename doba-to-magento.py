@@ -37,6 +37,25 @@ def is_in_stock(row):
     return "1"
   else:
     return "0"
+
+def get_name(row):
+    return row.get('title')
+
+def get_short_description(row):
+    short_desc = row.get('item_name')
+    if short_desc:
+        return short_desc
+    else:
+        return get_name(row)
+
+def get_description(row):
+    desc = row.get('description')
+    if desc:
+        return desc
+    else:
+        return get_short_description(row)
+        
+
     
 def create_magento_dict(row):
   image_url = '/' + get_filename_from_url(row.get('image_file'))
@@ -56,15 +75,15 @@ def create_magento_dict(row):
         "_product_websites": 'base',
         "url_key": slugify(row.get('item_name')), 
         "cost": row.get('price'),
-        "description": row.get('description'),
+        "description": get_description(row),
         "image": image_url,
-        "name": row.get('title'),
+        "name": get_name(row),
         "price": row.get('msrp'),
         "_media_image": image_url,
         "_media_attribute_id": '88',
         "_media_position": '1',
         "_media_is_disabled": '0',
-        "short_description": row.get('item_name'),
+        "short_description": get_short_description(row),
         "small_image": image_url,
         "status": '1',
         "tax_class_id": '2',
