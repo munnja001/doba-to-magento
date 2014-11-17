@@ -144,8 +144,12 @@ if image_urls:
     if image_urls: 
         print "There are %s images to upload" % len(images_to_download)
         for image_url in images_to_download:
-            print "Uploading: %s" % image_url
-            ftp.storbinary('STOR ' + get_filename_from_url(image_url), urllib2.urlopen(image_url))
+            try:
+                print "Uploading: %s" % image_url
+                ftp.storbinary('STOR ' + get_filename_from_url(image_url),
+                               urllib2.urlopen(image_url))
+            except urllib2.HTTPError:
+                print "Image [%s] not found!" % image_url
         print "Finished!"
     else: print "No Images to Upload"
 else: print "No Images to Upload"
