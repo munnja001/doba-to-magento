@@ -1,32 +1,21 @@
 #!/usr/bin/env python
-import urllib2, csv, argparse, os, re, config
+import urllib2, csv, argparse, os, json, re, fnmatch, config
 
 parser = argparse.ArgumentParser(description='Process a Doba Product Export.')
-parser.add_argument('filename', type=str,
-                   help='the name of the file to parse')
+parser.add_argument('-f', '--filename', type=str, help='the name of the file to parse', default=[''])
 parser.add_argument('-c', '--category', nargs=1, default=[''])
+parser.add_argument('-j', '--json', nargs=1, default=[''])
 parser.add_argument('-q', '--qty-only', dest='quantityonly', action='store_true')
 
 args = parser.parse_args()
 
+if args.json:
+    files_config = json.load(open(args.json[0]))
+else:
+    files_config[args.category[0]] = args.filename[0]
+
 quantity_lower_bound = 0
 
-# Method to generate URL Slug (Copied from Internets)
-_slugify_strip_re = re.compile(r'[^\w\s-]')
-_slugify_hyphenate_re = re.compile(r'[-\s]+')
-def slugify(value):
-    """
-    Normalizes string, converts to lowercase, removes non-alpha characters,
-    and converts spaces to hyphens.
-
-    From Django's "django/template/defaultfilters.py".
-    """
-    import unicodedata
-    if not isinstance(value, unicode):
-        value = unicode(value)
-    value = unicodedata.normalize('NFKD', value).encode('ascii', 'ignore')
-    value = unicode(_slugify_strip_re.sub('', value).strip().lower())
-    return _slugify_hyphenate_re.sub('-', value)
 
 # gets the filename from a URL
 def get_filename_from_url(url):
@@ -57,7 +46,7 @@ def get_description(row):
         
 
     
-def create_magento_dict(row):
+def create_magento_dict(row, category):
   image_url = '/' + get_filename_from_url(row.get('image_file'))
   weight = '0.00' if not row.get('item_weight') else row.get('item_weight')
   result = {
@@ -71,9 +60,9 @@ def create_magento_dict(row):
     other_attributes = {
         "_attribute_set": 'Default',
         "_type": 'simple',
-        "_category": args.category[0],
+        "_category": category ,
         "_product_websites": 'base',
-        "url_key": slugify(row.get('item_name')), 
+        "url_key": config.slugify(row.get('item_name')), 
         "cost": row.get('price'),
         "description": get_description(row),
         "image": image_url,
@@ -100,8 +89,8 @@ def create_magento_dict(row):
 magento_qty_fieldnames = ["sku","qty", "is_in_stock", "manage_stock"]
 
 magento_fieldnames = magento_qty_fieldnames + ["_attribute_set", "_type", "_category",
-                      "_product_websites", "url_key", "cost", "description",
-                      "image", "name", "price", "_media_image",
+                      "_product_websites", "url_key", "cost", "price", 
+                      "image", "name", "description", "_media_image",
                       "_media_attribute_id", "_media_position",
                       "_media_is_disabled", "short_description", "small_image",
                       "status", "tax_class_id", "thumbnail", "visibility",
@@ -121,18 +110,30 @@ def create_magento_writer(fields):
 if not os.path.exists(config.export_dir):
     os.mkdir(config.export_dir)
 
-image_urls = []
+for file in fnmatch.filter(os.listdir(config.export_dir), config.magento_filename_prefix + '*'):
+    os.remove(config.export_dir + '/' + file)
+
+image_urls = set()
 # Create Magento CSV from Doba CSV
-with open(args.filename, 'rbU') as inputfile, open(config.magento_filename, 'w+') as magento_file:
-    product_reader = csv.DictReader(inputfile, delimiter=',', quotechar='"')
-    if args.quantityonly:
-        magento_writer = create_qty_magento_writer()
-    else:
-        magento_writer = create_full_magento_writer()
-    magento_writer.writeheader()
-    for row in product_reader:
-      image_urls.append(row.get('image_file'))
-      magento_writer.writerow(create_magento_dict(row))
+batch_number = 0
+batch_count = 0
+for category, filename in files_config.iteritems():
+    with open(filename, 'rbU') as inputfile:
+        product_reader = csv.DictReader(inputfile, delimiter=',', quotechar='"')
+        for row in product_reader:
+            image_urls.add(row.get('image_file'))
+            with open(config.export_dir + '/' + config.magento_filename_prefix + str(batch_number).zfill(3) + '.csv', 'a') as magento_file:
+                if args.quantityonly:
+                    magento_writer = create_qty_magento_writer()
+                else:
+                    magento_writer = create_full_magento_writer()
+                if batch_count == 0:
+                    magento_writer.writeheader()
+                magento_writer.writerow(create_magento_dict(row, category))
+                batch_count += 1
+                if batch_count == config.batch_size:
+                    batch_number += 1
+                    batch_count = 0
     
 # Upload images via FTP  
 from ftplib import FTP
@@ -142,10 +143,11 @@ if image_urls:
     ftp_files = ftp.nlst()
     images_to_download = [x for x in image_urls if get_filename_from_url(x) not in ftp_files]
     if image_urls: 
-        print "There are %s images to upload" % len(images_to_download)
-        for image_url in images_to_download:
+        image_count = len(images_to_download)
+        print "There are %s images to upload" % image_count
+        for idx, image_url in enumerate(images_to_download):
             try:
-                print "Uploading: %s" % image_url
+                print "Uploading: (" + str(idx + 1) + " of " + str(image_count) + ") - " + str(image_url)
                 ftp.storbinary('STOR ' + get_filename_from_url(image_url),
                                urllib2.urlopen(image_url))
             except urllib2.HTTPError:
