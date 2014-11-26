@@ -1,7 +1,11 @@
 #!/usr/bin/env python
-import sys, requests, os, re, json, config
+import sys, requests, os, re, json, config, argparse
 from bs4 import BeautifulSoup
 
+parser = argparse.ArgumentParser(description='Export one or more doba inventory lists')
+parser.add_argument('-k', '--keep-categories', help='Dont try to guess the doba->magento category mapping', action='store_true')
+
+args = parser.parse_args()
 
 def save_list_as_file(file_name, list_url):
     with open(file_name, 'wb+') as magento_file:
@@ -55,5 +59,6 @@ for inventory_list_elem in inventory_lists:
     print 'Saving File with name ' + file_name
     save_list_as_file(file_name, inventory_list_elem.get('href'))
 
-with open('config.json', 'w+') as config_file:
-  json.dump(category_file_dict, config_file)
+if not args.keep_categories:
+    with open('config.json', 'w+') as config_file:
+        json.dump(category_file_dict, config_file)
